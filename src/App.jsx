@@ -42,7 +42,6 @@ export function App() {
 
   // Quiz configuration state
   const [repoUrl, setRepoUrl] = useState('');
-  const [branch, setBranch] = useState('');
   const [mode, setMode] = useState('quick');
   const [customTotal, setCustomTotal] = useState(5);
   const [customCounts, setCustomCounts] = useState({ Easy: 2, Medium: 2, Hard: 1 });
@@ -149,7 +148,7 @@ export function App() {
     });
 
     try {
-      const parsedRepo = parseGitHubRepoUrl(repoUrl, branch);
+      const parsedRepo = parseGitHubRepoUrl(repoUrl);
       const cacheKey = `${parsedRepo.fullName}@${parsedRepo.branch || 'default'}`;
       let builtMap = repoCacheRef.current.get(cacheKey);
 
@@ -339,9 +338,7 @@ export function App() {
             <RepoStep
               language="en"
               repoUrl={repoUrl}
-              branch={branch}
               onChangeRepoUrl={setRepoUrl}
-              onChangeBranch={setBranch}
               onBack={() => setCurrentStep('settings')}
               onContinue={() => setCurrentStep('mode')}
             />

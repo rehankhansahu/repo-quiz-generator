@@ -1,20 +1,12 @@
 import { useState } from 'react';
-import { AlertCircle, ArrowLeft, ArrowRight, FolderGit2, GitBranch } from 'lucide-react';
+import { AlertCircle, ArrowLeft, ArrowRight, FolderGit2 } from 'lucide-react';
 import { parseGitHubRepoUrl } from '../services/githubUrl.js';
 import { t } from '../utils/i18n.js';
-
-const SAMPLE_REPOS = [
-  'https://github.com/sindresorhus/ky',
-  'https://github.com/expressjs/express',
-  'https://github.com/pallets/flask',
-];
 
 export function RepoStep({
   language,
   repoUrl,
-  branch,
   onChangeRepoUrl,
-  onChangeBranch,
   onBack,
   onContinue,
 }) {
@@ -23,7 +15,7 @@ export function RepoStep({
   const handleSubmit = (e) => {
     e.preventDefault();
     try {
-      parseGitHubRepoUrl(repoUrl, branch);
+      parseGitHubRepoUrl(repoUrl);
       setError('');
       onContinue();
     } catch {
@@ -65,43 +57,6 @@ export function RepoStep({
             placeholder={t(language, 'repo.urlPlaceholder')}
             autoFocus
           />
-        </div>
-
-        <div className="field-group">
-          <label htmlFor="repo-branch-input" className="field-label">
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-              <GitBranch size={16} />
-              {t(language, 'repo.branchLabel')}
-            </span>
-          </label>
-          <input
-            id="repo-branch-input"
-            type="text"
-            className="text-input mono"
-            value={branch}
-            onChange={(e) => onChangeBranch(e.target.value)}
-            placeholder={t(language, 'repo.branchPlaceholder')}
-          />
-        </div>
-
-        <div className="field-group">
-          <span className="field-hint">{t(language, 'repo.examplesTitle')}</span>
-          <div className="chip-list">
-            {SAMPLE_REPOS.map((sample) => (
-              <button
-                key={sample}
-                type="button"
-                className="btn btn-secondary btn-sm mono"
-                onClick={() => {
-                  onChangeRepoUrl(sample);
-                  onChangeBranch('');
-                  setError('');
-                }}
-              >
-                {sample.replace('https://github.com/', '')}
-              </button>
-            ))}
-          </div>
         </div>
       </div>
 
