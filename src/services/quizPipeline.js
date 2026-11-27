@@ -82,6 +82,21 @@ const CHUNK_SUMMARY_SCHEMA = {
   required: ['moduleOverview', 'files', 'crossFileFlows'],
 };
 
+export function getCodeSnippetQuota(totalQuestions) {
+  if (totalQuestions <= 0) return 0;
+  if (totalQuestions <= 5) return 1;
+  return Math.min(4, Math.max(2, Math.round(totalQuestions * 0.25)));
+}
+
+function shuffleArray(items) {
+  const copy = [...items];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+}
+
 function formatSingleFileContent(content, totalFilesCount) {
   if (totalFilesCount <= 12 || content.length <= MAX_SINGLE_FILE_PROMPT_CHARS) {
     return content;
@@ -235,7 +250,7 @@ function tokenizeForSimilarity(text) {
   );
 }
 
-function isNearDuplicate(candidateText, existingTexts) {
+function isNearDuplicate(candidateText, existingTexts, threshold = 0.65) {
   const a = tokenizeForSimilarity(candidateText);
   if (a.size === 0) return false;
   for (const existing of existingTexts) {
@@ -246,7 +261,7 @@ function isNearDuplicate(candidateText, existingTexts) {
       if (b.has(token)) intersection++;
     }
     const union = a.size + b.size - intersection;
-    if (union > 0 && intersection / union >= 0.65) {
+    if (union > 0 && intersection / union >= threshold) {
       return true;
     }
   }
@@ -255,7 +270,7 @@ function isNearDuplicate(candidateText, existingTexts) {
 
 /**
  * Validates raw questions from Gemini against strict quality, grounding, language,
- * uniqueness, and per-difficulty count constraints.
+ * uniqueness, code-snippet budget, and per-difficulty count constraints.
  */
 export function validateQuizQuestions({
   rawQuestions,
@@ -263,6 +278,8 @@ export function validateQuizQuestions({
   validFiles,
   language,
   acceptedQuestions = [],
+  previousQuestions = [],
+  maxCodeSnippets = Infinity,
   allowSameFile = false,
 }) {
   const validPathMap = new Map(validFiles.map((f) => [f.path.toLowerCase(), f.path]));
@@ -275,12 +292,14 @@ export function validateQuizQuestions({
   const rejectedReasons = [];
 
   const existingQuestionTexts = acceptedQuestions.map((q) => q.question);
+  const previousQuestionTexts = previousQuestions.map((q) => q.question).filter(Boolean);
   const usedBaseFiles = new Set(
     acceptedQuestions.map((q) => extractBaseFilePath(q.sourceFile, validPathMap)).filter(Boolean)
   );
   let readmeCount = acceptedQuestions.filter((q) =>
     /(^|\/)readme/i.test(extractBaseFilePath(q.sourceFile, validPathMap))
   ).length;
+  let snippetCount = acceptedQuestions.filter((q) => Boolean(q.codeSnippet)).length;
 
   for (const item of Array.isArray(rawQuestions) ? rawQuestions : []) {
     if (!item || typeof item !== 'object') {
@@ -355,6 +374,16 @@ export function validateQuizQuestions({
       continue;
     }
 
+    if (!allowSameFile && previousQuestionTexts.length > 0 && isNearDuplicate(qText, previousQuestionTexts, 0.55)) {
+      rejectedReasons.push('repeated_previous_question');
+      continue;
+    }
+
+    if (!allowSameFile && codeSnippet && snippetCount >= maxCodeSnippets) {
+      rejectedReasons.push('exceeded_code_snippet_budget');
+      continue;
+    }
+
     accepted.push({
       id: item.id || `q${acceptedQuestions.length + accepted.length + 1}`,
       difficulty: diff,
@@ -374,6 +403,7 @@ export function validateQuizQuestions({
     need[diff] -= 1;
     if (baseFile) usedBaseFiles.add(baseFile);
     if (isReadme) readmeCount += 1;
+    if (codeSnippet) snippetCount += 1;
   }
 
   return {
@@ -412,7 +442,7 @@ function buildSystemInstruction(language) {
     '6. QUESTION STYLE, CODE SNIPPETS & QUALITY:',
     '   - Ask meaningful, practical software-engineering questions grounded in this project — combining real project context with conceptual understanding (e.g., WHY something is configured/coded a certain way, what files should not be uploaded to GitHub and why, how a pattern/hook/middleware behaves, what output or edge case occurs).',
     '   - AVOID trivial rote lookup questions (e.g. "Which exact string is written on line X?", "Which version number is in package.json?", "Which folder name is listed in .gitignore?") or language syntax trivia. Instead frame practical questions around purpose, developer workflow, behavior, and engineering reasoning grounded in the repo.',
-    '   - Whenever a question involves code logic, function behavior, output prediction, validation, edge cases, or config behavior, provide a real 2-12 line excerpt from the codebase in `codeSnippet` (use "" only for high-level conceptual/architecture questions). Never make `codeSnippet` trivially leak the answer.',
+    '   - CODE SNIPPET BUDGET: Keep code-snippet questions focused and selective! Include a real 2-10 line `codeSnippet` ONLY on the exact small number of code-snippet questions requested in the prompt (for all other questions, set `codeSnippet` to "" and ask clear conceptual, workflow, architecture, or behavior questions that do NOT depend on pasting a code block). Never make `codeSnippet` trivially leak the answer.',
     '7. Provide 4 distinct, plausible options (A-D) with exactly one unambiguously correct answer. NEVER use "All of the above", "None of the above", or "Both A and B".',
     'DIFFICULTY DEFINITIONS:',
     '- Easy: Practical understanding of a file, config, dependency, or workflow in this project (e.g. why certain files/folders are excluded from GitHub uploads, what role a library/script serves, or what a clear module achieves).',
@@ -481,6 +511,7 @@ export async function generateRepoQuiz({
   projectMap,
   counts,
   language = 'en',
+  previousQuestions = [],
   onStageChange,
   signal,
 }) {
@@ -496,12 +527,14 @@ export async function generateRepoQuiz({
   let contextPayload = '';
 
   if (!useMapReduce) {
+    // Shuffle file ordering on each generation so repeated quizzes explore different files/angles
+    const shuffledFiles = shuffleArray(projectMap.files);
     contextPayload = [
       '=== PROJECT MAP ===',
       projectMap.summaryText,
       '',
       '=== FULL REPOSITORY FILES ===',
-      formatFilesPayload(projectMap.files),
+      formatFilesPayload(shuffledFiles),
     ].join('\n');
   } else {
     const chunks = buildModuleChunks(projectMap.files, CHUNK_CHAR_LIMIT);
@@ -585,6 +618,8 @@ export async function generateRepoQuiz({
     Medium: counts.Medium || 0,
     Hard: counts.Hard || 0,
   };
+  const totalWanted = remaining.Easy + remaining.Medium + remaining.Hard;
+  const snippetQuota = getCodeSnippetQuota(totalWanted);
   const accepted = [];
 
   for (let attempt = 1; attempt <= MAX_GENERATION_ATTEMPTS; attempt++) {
@@ -596,27 +631,37 @@ export async function generateRepoQuiz({
       attempt,
     });
 
-    const alreadyCoveredFiles = accepted.map((q) => q.sourceFile);
-    const alreadyQuestions = accepted.map((q) => `- [${q.difficulty}] ${q.question} (${q.sourceFile})`);
+    const acceptedSnippets = accepted.filter((q) => Boolean(q.codeSnippet)).length;
+    const remainingSnippetQuota = Math.max(0, snippetQuota - acceptedSnippets);
 
-    const distributionText = coveragePlan.moduleTargets
+    const alreadyQuestions = accepted.map((q) => `- [${q.difficulty}] ${q.question} (${q.sourceFile})`);
+    const priorRepoQuestions = previousQuestions.map(
+      (q) => `- ${q.question}${q.sourceFile ? ` (${q.sourceFile})` : ''}`
+    );
+
+    const shuffledTargets = shuffleArray(coveragePlan.moduleTargets);
+    const distributionText = shuffledTargets
       .map((m) => `${m.module}: ~${m.count} question(s)`)
       .join(', ');
 
     const userPrompt = [
-      `Generate EXACTLY ${totalRemaining} multiple-choice questions for repository "${projectMap.repoInfo.fullName}".`,
+      `Generate EXACTLY ${totalRemaining} brand-new multiple-choice questions for repository "${projectMap.repoInfo.fullName}" (session variation seed: ${Date.now()}-${Math.floor(Math.random() * 10000)}).`,
       `REQUIRED EXACT DIFFICULTY COUNTS FOR THIS RESPONSE:`,
       `- Easy: ${remaining.Easy}`,
       `- Medium: ${remaining.Medium}`,
       `- Hard: ${remaining.Hard}`,
       `Total questions in JSON array MUST equal ${totalRemaining}.`,
       '',
+      `CODE SNIPPET QUOTA: Include a non-empty \`codeSnippet\` (2-10 real lines) on ONLY ${remainingSnippetQuota} of these ${totalRemaining} question(s). For the other ${Math.max(0, totalRemaining - remainingSnippetQuota)} question(s), set \`codeSnippet\` to "" and ask clear project-grounded questions without a code block.`,
       `PROJECT-WIDE COVERAGE TARGETS (spread across modules, code, configs, tests, architecture): ${distributionText}.`,
       coveragePlan.nonReadmeCount >= 2
         ? 'IMPORTANT: Base questions on source code, configs, tests, and manifests — NEVER rely only on README.md.'
         : '',
-      alreadyCoveredFiles.length > 0
-        ? `AVOID REPEATING THESE ALREADY-COVERED FILES/QUESTIONS:\n${alreadyQuestions.join('\n')}`
+      priorRepoQuestions.length > 0
+        ? `PREVIOUSLY ASKED QUESTIONS ON THIS REPO — DO NOT REPEAT OR PARAPHRASE THESE; PICK DIFFERENT FILES, FUNCTIONS & TOPICS:\n${priorRepoQuestions.join('\n')}`
+        : '',
+      alreadyQuestions.length > 0
+        ? `ALREADY GENERATED IN THIS QUIZ — DO NOT REPEAT:\n${alreadyQuestions.join('\n')}`
         : '',
       '',
       'REPOSITORY DATA:',
@@ -632,7 +677,7 @@ export async function generateRepoQuiz({
       systemInstruction,
       prompt: userPrompt,
       responseSchema: QUIZ_RESPONSE_SCHEMA,
-      temperature: attempt === 1 ? 0.3 : 0.45,
+      temperature: attempt === 1 ? (previousQuestions.length > 0 ? 0.65 : 0.45) : 0.7,
       signal,
     });
 
@@ -644,6 +689,8 @@ export async function generateRepoQuiz({
       validFiles: projectMap.files,
       language,
       acceptedQuestions: accepted,
+      previousQuestions,
+      maxCodeSnippets: snippetQuota,
       allowSameFile: attempt === MAX_GENERATION_ATTEMPTS,
     });
 
@@ -651,7 +698,6 @@ export async function generateRepoQuiz({
     remaining = validation.remainingCounts;
   }
 
-  const totalWanted = (counts.Easy || 0) + (counts.Medium || 0) + (counts.Hard || 0);
   if (accepted.length < totalWanted) {
     throw new AppError(
       ERROR_CODES.MALFORMED_OUTPUT,

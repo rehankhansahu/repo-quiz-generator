@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { parseGitHubRepoUrl } from '../services/githubUrl.js';
 import { evaluateTreeEntry, filterRepositoryTree } from '../services/fileFilter.js';
 import { buildProjectMap } from '../services/projectMapper.js';
-import { buildModuleChunks, validateQuizQuestions } from '../services/quizPipeline.js';
+import { buildModuleChunks, getCodeSnippetQuota, validateQuizQuestions } from '../services/quizPipeline.js';
 import {
+  appendRepoQuestionHistory,
+  getRepoQuestionHistory,
   getStoredGeminiKey,
   removeGeminiKey,
   saveGeminiKey,
@@ -197,10 +199,52 @@ describe('quizPipeline validation & chunking', () => {
     expect(chunks.length).toBeGreaterThan(1);
     expect(chunks.reduce((sum, c) => sum + c.files.length, 0)).toBe(6);
   });
+
+  it('caps code snippets to 1 for small quizzes and a few for larger quizzes', () => {
+    expect(getCodeSnippetQuota(3)).toBe(1);
+    expect(getCodeSnippetQuota(5)).toBe(1);
+    expect(getCodeSnippetQuota(12)).toBe(3);
+    expect(getCodeSnippetQuota(20)).toBe(4);
+  });
+
+  it('filters out repeated previousQuestions and excess code snippets', () => {
+    const res = validateQuizQuestions({
+      rawQuestions: [
+        {
+          id: '1',
+          difficulty: 'Easy',
+          question: 'What does verifyAuth return in src/auth.js?',
+          codeSnippet: 'export const a = 1;',
+          options: { A: 'true', B: 'false', C: 'null', D: '0' },
+          correctAnswer: 'A',
+          explanation: 'Returns true.',
+          sourceFile: 'src/auth.js',
+        },
+        {
+          id: '2',
+          difficulty: 'Medium',
+          question: 'How does src/api.js export b?',
+          codeSnippet: 'export const b = 2;',
+          options: { A: 'named', B: 'default', C: 'cjs', D: 'none' },
+          correctAnswer: 'A',
+          explanation: 'Named export.',
+          sourceFile: 'src/api.js',
+        },
+      ],
+      remainingCounts: { Easy: 1, Medium: 1, Hard: 0 },
+      validFiles,
+      language: 'en',
+      previousQuestions: [{ question: 'What does verifyAuth return in src/auth.js?' }],
+      maxCodeSnippets: 1,
+    });
+
+    expect(res.accepted).toHaveLength(1);
+    expect(res.accepted[0].sourceFile).toBe('src/api.js');
+  });
 });
 
 describe('storage helpers', () => {
-  it('persists and removes Gemini key, theme, and language in localStorage', () => {
+  it('persists and removes Gemini key, theme, language, and repo question history', () => {
     window.localStorage.clear();
     expect(getStoredGeminiKey()).toBe('');
     saveGeminiKey('AIzaTestKey123');
@@ -212,5 +256,8 @@ describe('storage helpers', () => {
     expect(getStoredTheme()).toBe('dark');
     saveLanguage('hinglish');
     expect(getStoredLanguage()).toBe('hinglish');
+
+    appendRepoQuestionHistory('owner/repo', [{ question: 'Q1?', sourceFile: 'src/a.js' }]);
+    expect(getRepoQuestionHistory('owner/repo')).toHaveLength(1);
   });
 });

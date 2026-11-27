@@ -10,7 +10,9 @@ import { QuizStep } from './components/QuizStep.jsx';
 import { ResultsStep } from './components/ResultsStep.jsx';
 
 import {
+  appendRepoQuestionHistory,
   getInitialTheme,
+  getRepoQuestionHistory,
   getStoredGeminiKey,
   getStoredGeminiModel,
   getStoredLanguage,
@@ -66,7 +68,6 @@ export function App() {
   const [submittedAnswers, setSubmittedAnswers] = useState({});
 
   const abortRef = useRef(null);
-  const repoCacheRef = useRef(new Map());
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -149,75 +150,69 @@ export function App() {
 
     try {
       const parsedRepo = parseGitHubRepoUrl(repoUrl);
-      const cacheKey = `${parsedRepo.fullName}@${parsedRepo.branch || 'default'}`;
-      let builtMap = repoCacheRef.current.get(cacheKey);
+      const meta = await fetchRepoMetadata({
+        owner: parsedRepo.owner,
+        repo: parsedRepo.repo,
+        signal: controller.signal,
+      });
 
-      if (builtMap) {
-        setProjectMap(builtMap);
-      } else {
-        const meta = await fetchRepoMetadata({
-          owner: parsedRepo.owner,
-          repo: parsedRepo.repo,
-          signal: controller.signal,
-        });
+      const resolvedBranch = parsedRepo.branch || meta.default_branch || 'main';
+      const rawTree = await fetchRepoTree({
+        owner: parsedRepo.owner,
+        repo: parsedRepo.repo,
+        branch: resolvedBranch,
+        signal: controller.signal,
+      });
 
-        const resolvedBranch = parsedRepo.branch || meta.default_branch || 'main';
-        const rawTree = await fetchRepoTree({
-          owner: parsedRepo.owner,
-          repo: parsedRepo.repo,
-          branch: resolvedBranch,
-          signal: controller.signal,
-        });
-
-        setProgress((prev) => ({ ...prev, stage: 'filtering' }));
-        const filtered = filterRepositoryTree(rawTree);
-        if (filtered.selectedFiles.length === 0) {
-          throw new AppError(ERROR_CODES.EMPTY_REPO, 'No readable code/config/doc files found.');
-        }
-
-        setProgress((prev) => ({
-          ...prev,
-          stage: 'fetching',
-          filesFetched: 0,
-          filesTotal: filtered.selectedFiles.length,
-        }));
-
-        const downloaded = await fetchRepositoryFiles({
-          owner: parsedRepo.owner,
-          repo: parsedRepo.repo,
-          branch: resolvedBranch,
-          files: filtered.selectedFiles,
-          isPrivate: Boolean(meta.private),
-          onProgress: ({ fetched, total, currentPath }) => {
-            setProgress((prev) => ({
-              ...prev,
-              stage: 'fetching',
-              filesFetched: fetched,
-              filesTotal: total,
-              currentPath,
-            }));
-          },
-          signal: controller.signal,
-        });
-
-        if (downloaded.files.length === 0) {
-          throw new AppError(ERROR_CODES.EMPTY_REPO, 'Could not download readable files from repository.');
-        }
-
-        setProgress((prev) => ({ ...prev, stage: 'mapping' }));
-        builtMap = buildProjectMap({
-          repoInfo: {
-            ...parsedRepo,
-            branch: resolvedBranch,
-            description: meta.description || '',
-            private: Boolean(meta.private),
-          },
-          files: downloaded.files,
-          excludedStats: filtered.excludedStats,
-        });
-        repoCacheRef.current.set(cacheKey, builtMap);
-        setProjectMap(builtMap);
+      setProgress((prev) => ({ ...prev, stage: 'filtering' }));
+      const filtered = filterRepositoryTree(rawTree);
+      if (filtered.selectedFiles.length === 0) {
+        throw new AppError(ERROR_CODES.EMPTY_REPO, 'No readable code/config/doc files found.');
       }
+
+      setProgress((prev) => ({
+        ...prev,
+        stage: 'fetching',
+        filesFetched: 0,
+        filesTotal: filtered.selectedFiles.length,
+      }));
+
+      const downloaded = await fetchRepositoryFiles({
+        owner: parsedRepo.owner,
+        repo: parsedRepo.repo,
+        branch: resolvedBranch,
+        files: filtered.selectedFiles,
+        isPrivate: Boolean(meta.private),
+        onProgress: ({ fetched, total, currentPath }) => {
+          setProgress((prev) => ({
+            ...prev,
+            stage: 'fetching',
+            filesFetched: fetched,
+            filesTotal: total,
+            currentPath,
+          }));
+        },
+        signal: controller.signal,
+      });
+
+      if (downloaded.files.length === 0) {
+        throw new AppError(ERROR_CODES.EMPTY_REPO, 'Could not download readable files from repository.');
+      }
+
+      setProgress((prev) => ({ ...prev, stage: 'mapping' }));
+      const builtMap = buildProjectMap({
+        repoInfo: {
+          ...parsedRepo,
+          branch: resolvedBranch,
+          description: meta.description || '',
+          private: Boolean(meta.private),
+        },
+        files: downloaded.files,
+        excludedStats: filtered.excludedStats,
+      });
+      setProjectMap(builtMap);
+
+      const previousQuestions = getRepoQuestionHistory(builtMap.repoInfo.fullName);
 
       const quizResult = await generateRepoQuiz({
         apiKey: geminiKey,
@@ -225,6 +220,7 @@ export function App() {
         projectMap: builtMap,
         counts: getDesiredCounts(),
         language,
+        previousQuestions,
         onStageChange: (update) => {
           setProgress((prev) => ({
             ...prev,
@@ -236,6 +232,7 @@ export function App() {
         signal: controller.signal,
       });
 
+      appendRepoQuestionHistory(builtMap.repoInfo.fullName, quizResult.questions);
       setQuestions(quizResult.questions);
       setIsRunning(false);
       setCurrentStep('quiz');
