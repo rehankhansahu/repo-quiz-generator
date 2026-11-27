@@ -72,6 +72,7 @@ export function App() {
   const [submittedAnswers, setSubmittedAnswers] = useState({});
 
   const abortRef = useRef(null);
+  const repoCacheRef = useRef(new Map());
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -169,70 +170,78 @@ export function App() {
 
     try {
       const parsedRepo = parseGitHubRepoUrl(repoUrl, branch);
-      const meta = await fetchRepoMetadata({
-        owner: parsedRepo.owner,
-        repo: parsedRepo.repo,
-        token: githubToken,
-        signal: controller.signal,
-      });
+      const cacheKey = `${parsedRepo.fullName}@${parsedRepo.branch || 'default'}|${Boolean(githubToken)}`;
+      let builtMap = repoCacheRef.current.get(cacheKey);
 
-      const resolvedBranch = parsedRepo.branch || meta.default_branch || 'main';
-      const rawTree = await fetchRepoTree({
-        owner: parsedRepo.owner,
-        repo: parsedRepo.repo,
-        branch: resolvedBranch,
-        token: githubToken,
-        signal: controller.signal,
-      });
+      if (builtMap) {
+        setProjectMap(builtMap);
+      } else {
+        const meta = await fetchRepoMetadata({
+          owner: parsedRepo.owner,
+          repo: parsedRepo.repo,
+          token: githubToken,
+          signal: controller.signal,
+        });
 
-      setProgress((prev) => ({ ...prev, stage: 'filtering' }));
-      const filtered = filterRepositoryTree(rawTree);
-      if (filtered.selectedFiles.length === 0) {
-        throw new AppError(ERROR_CODES.EMPTY_REPO, 'No readable code/config/doc files found.');
-      }
-
-      setProgress((prev) => ({
-        ...prev,
-        stage: 'fetching',
-        filesFetched: 0,
-        filesTotal: filtered.selectedFiles.length,
-      }));
-
-      const downloaded = await fetchRepositoryFiles({
-        owner: parsedRepo.owner,
-        repo: parsedRepo.repo,
-        branch: resolvedBranch,
-        files: filtered.selectedFiles,
-        isPrivate: Boolean(meta.private),
-        token: githubToken,
-        onProgress: ({ fetched, total, currentPath }) => {
-          setProgress((prev) => ({
-            ...prev,
-            stage: 'fetching',
-            filesFetched: fetched,
-            filesTotal: total,
-            currentPath,
-          }));
-        },
-        signal: controller.signal,
-      });
-
-      if (downloaded.files.length === 0) {
-        throw new AppError(ERROR_CODES.EMPTY_REPO, 'Could not download readable files from repository.');
-      }
-
-      setProgress((prev) => ({ ...prev, stage: 'mapping' }));
-      const builtMap = buildProjectMap({
-        repoInfo: {
-          ...parsedRepo,
+        const resolvedBranch = parsedRepo.branch || meta.default_branch || 'main';
+        const rawTree = await fetchRepoTree({
+          owner: parsedRepo.owner,
+          repo: parsedRepo.repo,
           branch: resolvedBranch,
-          description: meta.description || '',
-          private: Boolean(meta.private),
-        },
-        files: downloaded.files,
-        excludedStats: filtered.excludedStats,
-      });
-      setProjectMap(builtMap);
+          token: githubToken,
+          signal: controller.signal,
+        });
+
+        setProgress((prev) => ({ ...prev, stage: 'filtering' }));
+        const filtered = filterRepositoryTree(rawTree);
+        if (filtered.selectedFiles.length === 0) {
+          throw new AppError(ERROR_CODES.EMPTY_REPO, 'No readable code/config/doc files found.');
+        }
+
+        setProgress((prev) => ({
+          ...prev,
+          stage: 'fetching',
+          filesFetched: 0,
+          filesTotal: filtered.selectedFiles.length,
+        }));
+
+        const downloaded = await fetchRepositoryFiles({
+          owner: parsedRepo.owner,
+          repo: parsedRepo.repo,
+          branch: resolvedBranch,
+          files: filtered.selectedFiles,
+          isPrivate: Boolean(meta.private),
+          token: githubToken,
+          onProgress: ({ fetched, total, currentPath }) => {
+            setProgress((prev) => ({
+              ...prev,
+              stage: 'fetching',
+              filesFetched: fetched,
+              filesTotal: total,
+              currentPath,
+            }));
+          },
+          signal: controller.signal,
+        });
+
+        if (downloaded.files.length === 0) {
+          throw new AppError(ERROR_CODES.EMPTY_REPO, 'Could not download readable files from repository.');
+        }
+
+        setProgress((prev) => ({ ...prev, stage: 'mapping' }));
+        builtMap = buildProjectMap({
+          repoInfo: {
+            ...parsedRepo,
+            branch: resolvedBranch,
+            description: meta.description || '',
+            private: Boolean(meta.private),
+          },
+          files: downloaded.files,
+          excludedStats: filtered.excludedStats,
+        });
+        repoCacheRef.current.set(cacheKey, builtMap);
+        setProjectMap(builtMap);
+      }
 
       const quizResult = await generateRepoQuiz({
         apiKey: geminiKey,
@@ -435,7 +444,15 @@ export function App() {
 
       <footer className="app-footer">
         <div className="container">
-          Repo Quiz Generator — Browser-only static app. Keys stay in your localStorage and talk only to GitHub & Google Gemini APIs.
+          developed by{' '}
+          <a
+            href="https://rehankhansahu.github.io/muhammad-rehan-portfolio/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="footer-link"
+          >
+            Muhammad Rehan
+          </a>
         </div>
       </footer>
     </div>

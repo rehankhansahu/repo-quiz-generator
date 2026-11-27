@@ -2,7 +2,7 @@ import { AppError, ERROR_CODES } from '../utils/errors.js';
 
 const GITHUB_API_BASE = 'https://api.github.com';
 const GITHUB_RAW_BASE = 'https://raw.githubusercontent.com';
-const DEFAULT_CONCURRENCY = 6;
+const DEFAULT_CONCURRENCY = 16;
 const MAX_RETRIES = 2;
 
 function sleep(ms, signal) {

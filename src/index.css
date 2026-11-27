@@ -964,8 +964,22 @@ html[data-theme='dark'] .source-pill {
 .app-footer {
   padding: 18px 0 28px;
   text-align: center;
-  font-size: 0.8rem;
+  font-size: 0.85rem;
   color: var(--text-muted);
+}
+
+.footer-link {
+  color: var(--primary-600);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.footer-link:hover {
+  text-decoration: underline;
+}
+
+html[data-theme='dark'] .footer-link {
+  color: var(--primary-500);
 }
 
 /* Responsive */

@@ -2,8 +2,8 @@
 // Ensures source code, configs, tests, scripts, docs, and manifests are included,
 // while excluding build artifacts, dependencies, lockfiles, binaries, and oversized generated files.
 
-export const MAX_FILE_BYTES = 120 * 1024; // 120 KB per file
-export const MAX_FETCH_FILES = 200; // Safe upper bound across the entire repository
+export const MAX_FILE_BYTES = 60 * 1024; // 60 KB per file
+export const MAX_FETCH_FILES = 75; // Fast coverage across the entire repository via directory round-robin
 
 const EXCLUDED_DIRS = new Set([
   '.git',

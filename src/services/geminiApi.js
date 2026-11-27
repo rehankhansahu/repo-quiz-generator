@@ -2,20 +2,20 @@ import { AppError, ERROR_CODES } from '../utils/errors.js';
 
 const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
-// Preferred general text/coding models in priority order when Auto is selected.
+// Preferred fast text/coding models in priority order when Auto is selected.
 // We always verify active models dynamically via GET /v1beta/models so deprecated IDs are avoided.
 const PREFERRED_MODEL_ORDER = [
+  'gemini-3.5-flash-lite',
   'gemini-3.8-flash',
   'gemini-3.6-flash',
+  'gemini-3.1-flash-lite',
   'gemini-4-hydrogen',
   'gemini-4-neon',
-  'gemini-3.5-flash-lite',
-  'gemini-3.1-flash-lite',
-  'gemini-4-argon',
-  'gemini-4-carbon',
   'gemini-3-flash',
   'gemini-2.5-flash',
   'gemini-2.0-flash',
+  'gemini-4-argon',
+  'gemini-4-carbon',
 ];
 
 const EXCLUDED_MODEL_KEYWORDS = [
@@ -160,9 +160,20 @@ export function extractJsonText(rawText) {
   return trimmed;
 }
 
+function buildThinkingConfig(modelId, fastMode = false) {
+  const lower = (modelId || '').toLowerCase();
+  if (/^gemini-(3|4)/.test(lower)) {
+    return { thinkingLevel: fastMode ? 'MINIMAL' : 'LOW' };
+  }
+  if (/^gemini-2\.5/.test(lower)) {
+    return { thinkingBudget: 0 };
+  }
+  return null;
+}
+
 /**
  * Calls Gemini `generateContent` with structured JSON output (`responseMimeType` + `responseSchema`),
- * exponential backoff retries on transient errors/rate limits, and automatic model fallback on 404.
+ * low-latency thinking configuration, retries on transient errors/rate limits, and model fallback.
  */
 export async function generateStructuredJson({
   apiKey,
@@ -172,6 +183,7 @@ export async function generateStructuredJson({
   prompt,
   responseSchema,
   temperature = 0.3,
+  fastMode = false,
   signal,
 }) {
   const cleanKey = (apiKey || '').trim();
@@ -184,29 +196,35 @@ export async function generateStructuredJson({
   for (let mIdx = 0; mIdx < candidateModels.length; mIdx++) {
     const activeModel = candidateModels[mIdx];
     const url = `${GEMINI_API_BASE}/models/${encodeURIComponent(activeModel)}:generateContent`;
-
-    const payload = {
-      systemInstruction: {
-        parts: [{ text: systemInstruction }],
-      },
-      contents: [
-        {
-          role: 'user',
-          parts: [{ text: prompt }],
-        },
-      ],
-      generationConfig: {
-        temperature,
-        responseMimeType: 'application/json',
-        responseSchema,
-      },
-    };
+    let thinkingCfg = buildThinkingConfig(activeModel, fastMode);
 
     const maxAttempts = 3;
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       if (signal?.aborted) {
         throw new AppError(ERROR_CODES.ABORTED, 'Aborted');
       }
+
+      const generationConfig = {
+        temperature,
+        responseMimeType: 'application/json',
+        responseSchema,
+      };
+      if (thinkingCfg) {
+        generationConfig.thinkingConfig = thinkingCfg;
+      }
+
+      const payload = {
+        systemInstruction: {
+          parts: [{ text: systemInstruction }],
+        },
+        contents: [
+          {
+            role: 'user',
+            parts: [{ text: prompt }],
+          },
+        ],
+        generationConfig,
+      };
 
       let res;
       try {
@@ -224,7 +242,7 @@ export async function generateStructuredJson({
           throw new AppError(ERROR_CODES.ABORTED, 'Aborted');
         }
         if (attempt < maxAttempts - 1) {
-          await sleep(600 * Math.pow(2, attempt), signal);
+          await sleep(500 * Math.pow(2, attempt), signal);
           continue;
         }
         throw new AppError(ERROR_CODES.NETWORK_ERROR, err?.message || 'Network failure contacting Gemini API.');
@@ -251,6 +269,12 @@ export async function generateStructuredJson({
       const errorBody = await res.json().catch(() => ({}));
       const apiMsg = errorBody?.error?.message || `HTTP ${res.status}`;
       const apiStatus = errorBody?.error?.status || '';
+
+      // If this model variant does not support thinkingConfig/MINIMAL/LOW, retry immediately without it
+      if (res.status === 400 && thinkingCfg && /thinking/i.test(apiMsg)) {
+        thinkingCfg = null;
+        continue;
+      }
 
       if (
         res.status === 401 ||

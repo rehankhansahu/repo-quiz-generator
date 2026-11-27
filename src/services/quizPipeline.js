@@ -1,8 +1,9 @@
 import { AppError, ERROR_CODES } from '../utils/errors.js';
 import { generateStructuredJson, resolveGeminiModels } from './geminiApi.js';
 
-const CHUNK_CHAR_LIMIT = 95_000;
-const REDUCE_RAW_BUDGET = 260_000;
+const CHUNK_CHAR_LIMIT = 150_000;
+const REDUCE_RAW_BUDGET = 180_000;
+const MAX_SINGLE_FILE_PROMPT_CHARS = 18_000;
 const MAX_GENERATION_ATTEMPTS = 3;
 
 const NON_ROMAN_SCRIPT_RE = /[\u0900-\u097F\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF]/;
@@ -80,11 +81,21 @@ const CHUNK_SUMMARY_SCHEMA = {
   required: ['moduleOverview', 'files', 'crossFileFlows'],
 };
 
+function formatSingleFileContent(content, totalFilesCount) {
+  if (totalFilesCount <= 12 || content.length <= MAX_SINGLE_FILE_PROMPT_CHARS) {
+    return content;
+  }
+  const head = content.slice(0, 11_000);
+  const tail = content.slice(-4_000);
+  return `${head}\n\n/* ... truncated middle of large file for speed ... */\n\n${tail}`;
+}
+
 function formatFilesPayload(files) {
+  const count = files.length;
   return files
     .map(
       (f) =>
-        `=== FILE: ${f.path} (category: ${f.category}, language: ${f.language}) ===\n${f.content}\n=== END FILE: ${f.path} ===`
+        `=== FILE: ${f.path} (${f.category}, ${f.language}) ===\n${formatSingleFileContent(f.content, count)}\n=== END FILE ===`
     )
     .join('\n\n');
 }
@@ -468,8 +479,8 @@ export async function generateRepoQuiz({
 }) {
   const { primary, fallbacks } = await resolveGeminiModels(apiKey, preferredModel, { signal });
   const inputLimit = primary.inputTokenLimit || 1_000_000;
-  // ~3.4 chars/token; reserve generous headroom for system prompt, project map, and structured JSON output
-  const directCharBudget = Math.min(Math.floor(inputLimit * 0.55 * 3.4), 650_000);
+  // ~3.4 chars/token; keep single-pass direct context snappy while staying comfortably inside window
+  const directCharBudget = Math.min(Math.floor(inputLimit * 0.45 * 3.4), 450_000);
 
   const useMapReduce = projectMap.totalChars > directCharBudget;
   const strategy = useMapReduce ? 'map-reduce' : 'direct';
@@ -523,6 +534,7 @@ export async function generateRepoQuiz({
           prompt: mapPrompt,
           responseSchema: CHUNK_SUMMARY_SCHEMA,
           temperature: 0.2,
+          fastMode: true,
           signal,
         });
 
@@ -541,7 +553,7 @@ export async function generateRepoQuiz({
     };
 
     await Promise.all(
-      Array.from({ length: Math.min(2, Math.max(1, chunks.length)) }, () => mapWorker())
+      Array.from({ length: Math.min(4, Math.max(1, chunks.length)) }, () => mapWorker())
     );
 
     const rawRepresentative = selectRepresentativeRawFiles(projectMap.files, REDUCE_RAW_BUDGET);
