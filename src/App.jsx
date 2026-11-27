@@ -398,6 +398,7 @@ export function App() {
             <ResultsStep
               language={language}
               repoFullName={projectMap?.repoInfo?.fullName || repoUrl}
+              repoUrl={projectMap?.repoInfo?.canonicalUrl || repoUrl}
               questions={questions}
               submittedAnswers={submittedAnswers}
               onRetakeQuiz={handleRetakeQuiz}

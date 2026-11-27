@@ -386,11 +386,11 @@ export function validateQuizQuestions({
 function buildLanguageInstruction(language) {
   if (language === 'hinglish') {
     return [
-      'LANGUAGE: Hinglish (casual Roman-script Hindi/Urdu mixed with English, the way a developer naturally chats).',
-      'Examples of natural Hinglish tone: "Is function me kon sa parameter required hai?", "Ye code run krne par kya output aaye ga?", "Is module ka main kaam kya hai?".',
-      'STRICT SCRIPT RULE: Use ONLY Roman script (A-Z, a-z). NEVER use Devanagari (Hindi script) or Arabic/Urdu script.',
+      'LANGUAGE: Roman Urdu (casual Roman-script Urdu mixed with English, the way a developer naturally chats).',
+      'Examples of natural Roman Urdu tone: "Is function me kon sa parameter required hai?", "Ye code run krne par kya output aaye ga?", "Is module ka main kaam kya hai?".',
+      'STRICT SCRIPT RULE: Use ONLY Roman script (A-Z, a-z). NEVER use Urdu/Arabic script or Devanagari script.',
       'KEEP ORIGINAL IDENTIFIERS: Keep all technical terms, file paths, function names, class names, variable names, CLI commands, and config keys in their exact original English code form.',
-      'Apply Hinglish to question text, all 4 options (A-D), and the explanation.',
+      'Apply Roman Urdu to question text, all 4 options (A-D), and the explanation.',
     ].join('\n');
   }
 

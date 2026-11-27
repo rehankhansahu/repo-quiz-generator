@@ -67,7 +67,7 @@ describe('App persistence and flow', () => {
     expect(nextBtn).toBeEnabled();
   });
 
-  it('switches themes and selects Hinglish in Language step while keeping setup English', () => {
+  it('switches themes and selects Roman Urdu in Language step while keeping setup English', () => {
     window.localStorage.setItem(STORAGE_KEYS.GEMINI_KEY, 'AIzaExistingKey');
     render(<App />);
 
@@ -81,7 +81,7 @@ describe('App persistence and flow', () => {
     fireEvent.click(screen.getByRole('button', { name: /Next: Choose Quiz Mode/i }));
     fireEvent.click(screen.getByRole('button', { name: /Next: Select Language/i }));
 
-    fireEvent.click(screen.getByRole('button', { name: /Hinglish/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Roman Urdu/i }));
     expect(window.localStorage.getItem(STORAGE_KEYS.LANGUAGE)).toBe('hinglish');
     expect(screen.getByText('Select Quiz Language')).toBeInTheDocument();
   });
@@ -140,11 +140,12 @@ describe('QuizStep and ResultsStep', () => {
     expect(screen.getByText(/src\/server\.js \(startServer\)/)).toBeInTheDocument();
   });
 
-  it('renders score, difficulty breakdown, review, Retake Quiz and Generate New Quiz buttons', () => {
+  it('renders score, difficulty breakdown, review, Retake Quiz, Generate New Quiz, and Download Result buttons', () => {
     render(
       <ResultsStep
         language="en"
         repoFullName="demo/repo"
+        repoUrl="https://github.com/demo/repo"
         questions={sampleQuestions}
         submittedAnswers={{ q1: 'A' }}
         onRetakeQuiz={() => {}}
@@ -156,5 +157,6 @@ describe('QuizStep and ResultsStep', () => {
     expect(screen.getByText('100% Accuracy')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Retake Quiz/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Generate New Quiz/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Download Result/i })).toBeInTheDocument();
   });
 });

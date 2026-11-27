@@ -1,11 +1,80 @@
-import { CheckCircle2, FileCode2, RotateCcw, Sparkles, Trophy, XCircle } from 'lucide-react';
+import { CheckCircle2, Download, FileCode2, RotateCcw, Sparkles, Trophy, XCircle } from 'lucide-react';
 import { t } from '../utils/i18n.js';
 
 const LEVELS = ['Easy', 'Medium', 'Hard'];
 
+export function buildResultReportText({
+  repoFullName,
+  repoUrl,
+  language,
+  questions,
+  submittedAnswers,
+}) {
+  const total = questions.length;
+  const correctTotal = questions.filter((q) => submittedAnswers[q.id] === q.correctAnswer).length;
+  const percentage = total > 0 ? Math.round((correctTotal / total) * 100) : 0;
+  const resolvedUrl =
+    repoUrl && repoUrl.startsWith('http')
+      ? repoUrl
+      : repoFullName && repoFullName.includes('/')
+        ? `https://github.com/${repoFullName}`
+        : repoUrl || '';
+
+  const lines = [
+    '============================================================',
+    'REPO QUIZ GENERATOR - QUIZ RESULT',
+    '============================================================',
+    `Repository     : ${repoFullName || 'N/A'}`,
+    `Repository URL : ${resolvedUrl || 'N/A'}`,
+    `Language       : ${language === 'hinglish' ? 'Roman Urdu' : 'English'}`,
+    `Generated At   : ${new Date().toLocaleString()}`,
+    `Final Score    : ${correctTotal} / ${total} (${percentage}%)`,
+    '',
+    'Breakdown by Difficulty:',
+  ];
+
+  for (const level of LEVELS) {
+    const items = questions.filter((q) => q.difficulty === level);
+    const right = items.filter((q) => submittedAnswers[q.id] === q.correctAnswer).length;
+    lines.push(`- ${level}: ${items.length > 0 ? `${right} / ${items.length}` : '0 questions'}`);
+  }
+
+  lines.push('', '------------------------------------------------------------', 'QUESTION-BY-QUESTION REVIEW', '------------------------------------------------------------');
+
+  questions.forEach((q, idx) => {
+    const userChoice = submittedAnswers[q.id];
+    const isCorrect = userChoice === q.correctAnswer;
+    lines.push('');
+    lines.push(`Q${idx + 1}. [${q.difficulty}] ${q.question}`);
+    if (q.codeSnippet) {
+      lines.push('Code:');
+      lines.push(q.codeSnippet);
+    }
+    for (const key of ['A', 'B', 'C', 'D']) {
+      lines.push(`  ${key}. ${q.options?.[key] || ''}`);
+    }
+    lines.push(
+      `Your Answer    : ${userChoice ? `${userChoice}. ${q.options?.[userChoice] || ''}` : 'Not answered'} (${isCorrect ? 'Correct' : 'Incorrect'})`
+    );
+    lines.push(`Correct Answer : ${q.correctAnswer}. ${q.options?.[q.correctAnswer] || ''}`);
+    lines.push(`Explanation    : ${q.explanation}`);
+    lines.push(`Source File    : ${q.sourceFile}`);
+  });
+
+  lines.push(
+    '',
+    '============================================================',
+    'Developed by Muhammad Rehan - https://rehankhansahu.github.io/muhammad-rehan-portfolio/',
+    '============================================================'
+  );
+
+  return lines.join('\n');
+}
+
 export function ResultsStep({
   language,
   repoFullName,
+  repoUrl,
   questions,
   submittedAnswers,
   onRetakeQuiz,
@@ -24,6 +93,26 @@ export function ResultsStep({
       correct: right,
     };
   });
+
+  const handleDownloadResult = () => {
+    const report = buildResultReportText({
+      repoFullName,
+      repoUrl,
+      language,
+      questions,
+      submittedAnswers,
+    });
+    const slug = (repoFullName || 'repo').replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/^-|-$/g, '');
+    const blob = new Blob([report], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${slug || 'repo'}-quiz-result.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <section className="card">
@@ -90,6 +179,10 @@ export function ResultsStep({
           <button type="button" className="btn btn-primary" onClick={onGenerateNewQuiz}>
             <Sparkles size={16} />
             <span>{t(language, 'results.newQuizBtn')}</span>
+          </button>
+          <button type="button" className="btn btn-secondary" onClick={handleDownloadResult}>
+            <Download size={16} />
+            <span>{t(language, 'results.downloadBtn')}</span>
           </button>
         </div>
 
