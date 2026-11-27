@@ -75,7 +75,7 @@ describe('App persistence and flow', () => {
     expect(window.localStorage.getItem(STORAGE_KEYS.THEME)).toBe('dark');
     expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
 
-    fireEvent.click(screen.getByRole('button', { name: /Language/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^Language$/i }));
     expect(window.localStorage.getItem(STORAGE_KEYS.LANGUAGE)).toBe('hinglish');
     expect(screen.getByText('GitHub Repository Chunein')).toBeInTheDocument();
   });
@@ -146,7 +146,7 @@ describe('QuizStep and ResultsStep', () => {
       />
     );
 
-    expect(screen.getByText('1 / 1')).toBeInTheDocument();
+    expect(screen.getAllByText('1 / 1')).toHaveLength(2);
     expect(screen.getByText('100% Accuracy')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Retake Quiz/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Generate New Quiz/i })).toBeInTheDocument();
