@@ -34,6 +34,7 @@ export const QUIZ_RESPONSE_SCHEMA = {
             enum: ['Easy', 'Medium', 'Hard'],
           },
           question: { type: 'STRING' },
+          codeSnippet: { type: 'STRING' },
           options: {
             type: 'OBJECT',
             properties: {
@@ -294,6 +295,7 @@ export function validateQuizQuestions({
     }
 
     const qText = (item.question || '').trim();
+    const codeSnippet = typeof item.codeSnippet === 'string' ? item.codeSnippet.trim() : '';
     const explanation = (item.explanation || '').trim();
     const correctAnswer = (item.correctAnswer || '').trim().toUpperCase();
     const opts = item.options;
@@ -357,6 +359,7 @@ export function validateQuizQuestions({
       id: item.id || `q${acceptedQuestions.length + accepted.length + 1}`,
       difficulty: diff,
       question: qText,
+      codeSnippet,
       options: {
         A: optionValues[0],
         B: optionValues[1],
@@ -406,7 +409,8 @@ function buildSystemInstruction(language) {
     '3. NEVER generate questions from general programming knowledge or from the README alone. Spread questions across real source code, configs, manifests, tests, and modules.',
     '4. Avoid clustering multiple questions on a single file unless the repository only has a few files.',
     '5. Every question MUST include a valid `sourceFile` from the repository (plus function/class name when relevant, e.g. `src/api/client.js (fetchWithRetry)`).',
-    '6. Provide 4 distinct, plausible options (A-D) with exactly one unambiguously correct answer. NEVER use "All of the above", "None of the above", or "Both A and B".',
+    '6. CODE SNIPPETS & QUALITY: Whenever a question is about code logic, function behavior, output prediction, validation, edge cases, or config behavior, provide a real 2-12 line excerpt from the codebase in `codeSnippet` (use "" only for high-level architecture questions). Never make `codeSnippet` trivially leak a fill-in-the-blank answer. Focus on real logic, behavior, data flow, and architecture — NEVER ask language syntax trivia or meaningless dependency version-number memorization questions.',
+    '7. Provide 4 distinct, plausible options (A-D) with exactly one unambiguously correct answer. NEVER use "All of the above", "None of the above", or "Both A and B".',
     'DIFFICULTY DEFINITIONS:',
     '- Easy: Direct facts observable in the code (what a file/function does, a config value, a dependency purpose, an exported route/command).',
     '- Medium: Understanding logic, control flow between modules, validation rules, error handling, or why an implementation is structured a certain way.',

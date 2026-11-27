@@ -128,6 +128,12 @@ export function ResultsStep({
 
                 <div style={{ fontWeight: 700, fontSize: '0.98rem' }}>{q.question}</div>
 
+                {q.codeSnippet && (
+                  <pre className="code-snippet-block">
+                    <code>{q.codeSnippet}</code>
+                  </pre>
+                )}
+
                 <div style={{ fontSize: '0.88rem', color: 'var(--text-secondary)', display: 'grid', gap: '4px' }}>
                   <div>
                     <strong>{t(language, 'results.yourAnswer')}:</strong>{' '}

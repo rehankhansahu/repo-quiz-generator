@@ -67,6 +67,12 @@ export function QuizStep({
 
         <h2 className="quiz-question-text">{question.question}</h2>
 
+        {question.codeSnippet && (
+          <pre className="code-snippet-block">
+            <code>{question.codeSnippet}</code>
+          </pre>
+        )}
+
         <div className="options-list" role="radiogroup" aria-label={question.question}>
           {OPTION_KEYS.map((key) => {
             const optionText = question.options?.[key] || '';

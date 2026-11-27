@@ -444,7 +444,7 @@ export function App() {
 
       <footer className="app-footer">
         <div className="container">
-          developed by{' '}
+          Developed by{' '}
           <a
             href="https://rehankhansahu.github.io/muhammad-rehan-portfolio/"
             target="_blank"
