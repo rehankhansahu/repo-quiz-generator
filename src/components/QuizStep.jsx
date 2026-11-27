@@ -21,7 +21,6 @@ export function QuizStep({
   const isSubmitted = Boolean(submittedChoice);
   const isCorrect = submittedChoice === question.correctAnswer;
   const isLast = currentIndex === questions.length - 1;
-  const answeredCount = Object.keys(submittedAnswers).length;
   const progressPct = Math.round(((currentIndex + (isSubmitted ? 1 : 0)) / questions.length) * 100);
 
   const difficultyClass =
@@ -47,18 +46,10 @@ export function QuizStep({
             </span>
           </div>
 
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '10px' }}>
-            <span className="field-hint">
-              {t(language, 'quiz.answeredProgress', {
-                answered: answeredCount,
-                total: questions.length,
-              })}
-            </span>
-            <button type="button" className="btn btn-ghost btn-sm" onClick={onExitQuiz}>
-              <FolderGit2 size={14} />
-              <span>{t(language, 'quiz.exitQuiz')}</span>
-            </button>
-          </div>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={onExitQuiz}>
+            <FolderGit2 size={14} />
+            <span>{t(language, 'quiz.exitQuiz')}</span>
+          </button>
         </div>
 
         <div className="progress-track" aria-label="Quiz progress">

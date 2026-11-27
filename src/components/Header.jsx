@@ -1,12 +1,9 @@
-import { Code2, KeyRound, Languages, Moon, Sun } from 'lucide-react';
+import { Code2, KeyRound, Moon, Sun } from 'lucide-react';
 import { t } from '../utils/i18n.js';
 
 export function Header({
   theme,
   onToggleTheme,
-  language,
-  onToggleLanguage,
-  hasGeminiKey,
   onOpenSettings,
   onLogoClick,
 }) {
@@ -17,51 +14,38 @@ export function Header({
           type="button"
           className="brand"
           onClick={onLogoClick}
-          title={t(language, 'appName')}
+          title={t('en', 'appName')}
         >
           <span className="brand-icon" aria-hidden="true">
             <Code2 size={22} />
           </span>
           <div>
-            <h1 className="brand-title">{t(language, 'appName')}</h1>
-            <p className="brand-subtitle">{t(language, 'appTagline')}</p>
+            <h1 className="brand-title">{t('en', 'appName')}</h1>
+            <p className="brand-subtitle">{t('en', 'appTagline')}</p>
           </div>
         </button>
 
         <div className="header-actions">
           <button
             type="button"
-            className={`icon-btn ${hasGeminiKey ? 'active-status' : ''}`}
+            className="icon-btn"
             onClick={onOpenSettings}
-            title={t(language, 'header.apiKeys')}
+            title="API Key"
           >
             <KeyRound size={15} />
-            <span>
-              {hasGeminiKey ? t(language, 'header.keySaved') : t(language, 'header.keyMissing')}
-            </span>
-          </button>
-
-          <button
-            type="button"
-            className="icon-btn"
-            onClick={onToggleLanguage}
-            aria-label={t(language, 'header.languageLabel')}
-            title={t(language, 'header.languageLabel')}
-          >
-            <Languages size={15} />
-            <span>{language === 'hinglish' ? 'Hinglish' : 'English'}</span>
+            <span>API Key</span>
           </button>
 
           <button
             type="button"
             className="icon-btn"
             onClick={onToggleTheme}
-            aria-label={t(language, 'header.toggleTheme')}
-            title={t(language, 'header.toggleTheme')}
+            aria-label={t('en', 'header.toggleTheme')}
+            title={t('en', 'header.toggleTheme')}
           >
             {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
             <span>
-              {theme === 'dark' ? t(language, 'header.lightMode') : t(language, 'header.darkMode')}
+              {theme === 'dark' ? t('en', 'header.lightMode') : t('en', 'header.darkMode')}
             </span>
           </button>
         </div>

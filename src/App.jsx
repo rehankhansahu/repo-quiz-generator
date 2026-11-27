@@ -51,7 +51,6 @@ export function App() {
   const [isRunning, setIsRunning] = useState(false);
   const [generationError, setGenerationError] = useState('');
   const [projectMap, setProjectMap] = useState(null);
-  const [strategy, setStrategy] = useState('');
   const [progress, setProgress] = useState({
     stage: 'idle',
     filesFetched: 0,
@@ -96,10 +95,6 @@ export function App() {
     saveLanguage(nextLang);
   };
 
-  const handleToggleLanguage = () => {
-    handleSelectLanguage(language === 'en' ? 'hinglish' : 'en');
-  };
-
   const handleSaveGeminiKey = (key) => {
     saveGeminiKey(key);
     setGeminiKey(key);
@@ -140,7 +135,6 @@ export function App() {
     setIsRunning(true);
     setGenerationError('');
     setProjectMap(null);
-    setStrategy('');
     setQuestions([]);
     setCurrentQuestionIndex(0);
     setSelectedOption('');
@@ -233,7 +227,6 @@ export function App() {
         counts: getDesiredCounts(),
         language,
         onStageChange: (update) => {
-          if (update.strategy) setStrategy(update.strategy);
           setProgress((prev) => ({
             ...prev,
             stage: update.stage,
@@ -311,9 +304,6 @@ export function App() {
       <Header
         theme={theme}
         onToggleTheme={handleToggleTheme}
-        language={language}
-        onToggleLanguage={handleToggleLanguage}
-        hasGeminiKey={Boolean(geminiKey)}
         onOpenSettings={() => {
           if (!isRunning) setCurrentStep('settings');
         }}
@@ -330,12 +320,12 @@ export function App() {
             onSelectStep={(step) => {
               if (!isRunning) setCurrentStep(step);
             }}
-            language={language}
+            language="en"
           />
 
           {currentStep === 'settings' && (
             <SettingsStep
-              language={language}
+              language="en"
               geminiKey={geminiKey}
               selectedModel={selectedModel}
               onSaveGeminiKey={handleSaveGeminiKey}
@@ -347,7 +337,7 @@ export function App() {
 
           {currentStep === 'repo' && (
             <RepoStep
-              language={language}
+              language="en"
               repoUrl={repoUrl}
               branch={branch}
               onChangeRepoUrl={setRepoUrl}
@@ -359,7 +349,7 @@ export function App() {
 
           {currentStep === 'mode' && (
             <ModeStep
-              language={language}
+              language="en"
               mode={mode}
               customTotal={customTotal}
               customCounts={customCounts}
@@ -384,8 +374,6 @@ export function App() {
             <GenerateStep
               language={language}
               progress={progress}
-              projectMap={projectMap}
-              strategy={strategy}
               error={generationError}
               isRunning={isRunning}
               onCancel={handleCancelGeneration}

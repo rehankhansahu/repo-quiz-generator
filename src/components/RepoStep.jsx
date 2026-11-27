@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { AlertCircle, ArrowLeft, ArrowRight, FolderGit2, GitBranch } from 'lucide-react';
 import { parseGitHubRepoUrl } from '../services/githubUrl.js';
 import { t } from '../utils/i18n.js';
@@ -19,15 +19,6 @@ export function RepoStep({
   onContinue,
 }) {
   const [error, setError] = useState('');
-
-  const parsedPreview = useMemo(() => {
-    if (!repoUrl.trim()) return null;
-    try {
-      return parseGitHubRepoUrl(repoUrl, branch);
-    } catch {
-      return null;
-    }
-  }, [repoUrl, branch]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -92,22 +83,6 @@ export function RepoStep({
             placeholder={t(language, 'repo.branchPlaceholder')}
           />
         </div>
-
-        {parsedPreview && (
-          <div className="alert alert-info">
-            <FolderGit2 size={17} style={{ flexShrink: 0, marginTop: '2px' }} />
-            <span>
-              <strong>{t(language, 'repo.parsedPreview')}</strong>{' '}
-              <code className="mono">{parsedPreview.fullName}</code>
-              {parsedPreview.branch ? (
-                <>
-                  {' '}
-                  @ <code className="mono">{parsedPreview.branch}</code>
-                </>
-              ) : null}
-            </span>
-          </div>
-        )}
 
         <div className="field-group">
           <span className="field-hint">{t(language, 'repo.examplesTitle')}</span>

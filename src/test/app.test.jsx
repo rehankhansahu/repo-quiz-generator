@@ -37,7 +37,7 @@ describe('App persistence and flow', () => {
     expect(screen.getByText('Select GitHub Repository')).toBeInTheDocument();
 
     // Open Settings to verify Update Key & Remove Key buttons exist
-    fireEvent.click(screen.getByRole('button', { name: /Key Saved/i }));
+    fireEvent.click(screen.getByRole('button', { name: /API Key/i }));
     expect(screen.getByRole('button', { name: /Update Key/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Remove Key/i })).toBeInTheDocument();
 
@@ -67,7 +67,7 @@ describe('App persistence and flow', () => {
     expect(nextBtn).toBeEnabled();
   });
 
-  it('switches themes and Hinglish language and persists preferences', () => {
+  it('switches themes and selects Hinglish in Language step while keeping setup English', () => {
     window.localStorage.setItem(STORAGE_KEYS.GEMINI_KEY, 'AIzaExistingKey');
     render(<App />);
 
@@ -75,9 +75,15 @@ describe('App persistence and flow', () => {
     expect(window.localStorage.getItem(STORAGE_KEYS.THEME)).toBe('dark');
     expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
 
-    fireEvent.click(screen.getByRole('button', { name: /^Language$/i }));
+    fireEvent.change(document.getElementById('repo-url-input'), {
+      target: { value: 'https://github.com/sindresorhus/ky' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Next: Choose Quiz Mode/i }));
+    fireEvent.click(screen.getByRole('button', { name: /Next: Select Language/i }));
+
+    fireEvent.click(screen.getByRole('button', { name: /Hinglish/i }));
     expect(window.localStorage.getItem(STORAGE_KEYS.LANGUAGE)).toBe('hinglish');
-    expect(screen.getByText('GitHub Repository Chunein')).toBeInTheDocument();
+    expect(screen.getByText('Select Quiz Language')).toBeInTheDocument();
   });
 });
 

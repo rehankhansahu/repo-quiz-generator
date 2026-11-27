@@ -7,7 +7,6 @@ import {
   EyeOff,
   KeyRound,
   Loader2,
-  ShieldCheck,
   Sparkles,
   Trash2,
 } from 'lucide-react';
@@ -95,16 +94,8 @@ export function SettingsStep({
   return (
     <section className="card">
       <div className="card-header">
-        <div className="row-between" style={{ marginBottom: '6px' }}>
-          <h2 className="card-title" style={{ margin: 0 }}>
-            {t(language, 'settings.title')}
-          </h2>
-          <span className="badge badge-blue">
-            <ShieldCheck size={13} />
-            localStorage
-          </span>
-        </div>
-        <p className="card-subtitle">{t(language, 'settings.subtitle')}</p>
+        <h2 className="card-title">{t(language, 'settings.title')}</h2>
+        <p className="card-subtitle">Enter your Google Gemini API key to generate quizzes from any GitHub repository.</p>
       </div>
 
       <div className="section-stack">
@@ -133,11 +124,6 @@ export function SettingsStep({
                 <KeyRound size={16} />
                 {t(language, 'settings.geminiSectionTitle')}
               </label>
-              {hasSavedGemini ? (
-                <span className="badge badge-easy">{t(language, 'settings.geminiSavedBadge')}</span>
-              ) : (
-                <span className="badge badge-blue">{t(language, 'settings.geminiRequiredBadge')}</span>
-              )}
             </div>
 
             <div className="input-row">
