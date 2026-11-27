@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it } from 'vitest';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import App from '../App.jsx';
 import { QuizStep } from '../components/QuizStep.jsx';
 import { ResultsStep } from '../components/ResultsStep.jsx';
@@ -10,6 +10,10 @@ describe('App persistence and flow', () => {
     window.localStorage.clear();
     document.documentElement.removeAttribute('data-theme');
     document.documentElement.className = '';
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it('prompts for Gemini key on first visit and persists it with show/hide, update, and remove', () => {
@@ -84,6 +88,68 @@ describe('App persistence and flow', () => {
     fireEvent.click(screen.getByRole('button', { name: /Roman Urdu/i }));
     expect(window.localStorage.getItem(STORAGE_KEYS.LANGUAGE)).toBe('hinglish');
     expect(screen.getByText('Select Quiz Language')).toBeInTheDocument();
+  });
+
+  it('saves optional GitHub token, fetches private repos, and selects one for the quiz', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      headers: new Headers(),
+      json: async () => [
+        {
+          id: 101,
+          name: 'secret-app',
+          full_name: 'rehan/secret-app',
+          html_url: 'https://github.com/rehan/secret-app',
+          description: 'Private service',
+          language: 'TypeScript',
+          default_branch: 'main',
+          updated_at: '2026-11-27T00:00:00Z',
+          private: true,
+        },
+        {
+          id: 102,
+          name: 'secret-api',
+          full_name: 'rehan/secret-api',
+          html_url: 'https://github.com/rehan/secret-api',
+          description: '',
+          language: 'JavaScript',
+          default_branch: 'main',
+          updated_at: '2026-11-26T00:00:00Z',
+          private: true,
+        },
+      ],
+    });
+
+    render(<App />);
+    fireEvent.change(screen.getByLabelText(/Google Gemini API Key/i), {
+      target: { value: 'AIzaTestGeminiKey' },
+    });
+    fireEvent.change(screen.getByLabelText(/GitHub Personal Access Token/i), {
+      target: { value: 'ghp_testPrivateToken' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Save & Continue/i }));
+
+    expect(window.localStorage.getItem(STORAGE_KEYS.GITHUB_TOKEN)).toBe('ghp_testPrivateToken');
+
+    await waitFor(() => {
+      expect(screen.getByText('2 found')).toBeInTheDocument();
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('/user/repos?visibility=private'),
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: 'Bearer ghp_testPrivateToken',
+        }),
+      })
+    );
+
+    const select = screen.getByLabelText(/Your Private Repositories/i);
+    fireEvent.change(select, { target: { value: 'https://github.com/rehan/secret-app' } });
+    expect(document.getElementById('repo-url-input')).toHaveValue('https://github.com/rehan/secret-app');
+
+    fireEvent.click(screen.getByRole('button', { name: /Next: Choose Quiz Mode/i }));
+    expect(screen.getByText('Choose Quiz Mode')).toBeInTheDocument();
   });
 });
 

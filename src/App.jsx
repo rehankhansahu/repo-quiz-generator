@@ -15,10 +15,13 @@ import {
   getRepoQuestionHistory,
   getStoredGeminiKey,
   getStoredGeminiModel,
+  getStoredGithubToken,
   getStoredLanguage,
   removeGeminiKey,
+  removeGithubToken,
   saveGeminiKey,
   saveGeminiModel,
+  saveGithubToken,
   saveLanguage,
   saveTheme,
 } from './utils/storage.js';
@@ -33,6 +36,7 @@ import { generateRepoQuiz } from './services/quizPipeline.js';
 export function App() {
   // Persistent user settings loaded from localStorage on startup
   const [geminiKey, setGeminiKey] = useState(() => getStoredGeminiKey());
+  const [githubToken, setGithubToken] = useState(() => getStoredGithubToken());
   const [selectedModel, setSelectedModel] = useState(() => getStoredGeminiModel());
   const [theme, setTheme] = useState(() => getInitialTheme());
   const [language, setLanguage] = useState(() => getStoredLanguage());
@@ -105,6 +109,16 @@ export function App() {
     setGeminiKey('');
   };
 
+  const handleSaveGithubToken = (token) => {
+    saveGithubToken(token);
+    setGithubToken(token);
+  };
+
+  const handleRemoveGithubToken = () => {
+    removeGithubToken();
+    setGithubToken('');
+  };
+
   const handleSelectModel = (modelId) => {
     saveGeminiModel(modelId);
     setSelectedModel(modelId);
@@ -153,6 +167,7 @@ export function App() {
       const meta = await fetchRepoMetadata({
         owner: parsedRepo.owner,
         repo: parsedRepo.repo,
+        token: githubToken,
         signal: controller.signal,
       });
 
@@ -161,6 +176,7 @@ export function App() {
         owner: parsedRepo.owner,
         repo: parsedRepo.repo,
         branch: resolvedBranch,
+        token: githubToken,
         signal: controller.signal,
       });
 
@@ -183,6 +199,7 @@ export function App() {
         branch: resolvedBranch,
         files: filtered.selectedFiles,
         isPrivate: Boolean(meta.private),
+        token: githubToken,
         onProgress: ({ fetched, total, currentPath }) => {
           setProgress((prev) => ({
             ...prev,
@@ -323,9 +340,12 @@ export function App() {
             <SettingsStep
               language="en"
               geminiKey={geminiKey}
+              githubToken={githubToken}
               selectedModel={selectedModel}
               onSaveGeminiKey={handleSaveGeminiKey}
               onRemoveGeminiKey={handleRemoveGeminiKey}
+              onSaveGithubToken={handleSaveGithubToken}
+              onRemoveGithubToken={handleRemoveGithubToken}
               onSelectModel={handleSelectModel}
               onContinue={() => setCurrentStep('repo')}
             />
@@ -336,6 +356,8 @@ export function App() {
               language="en"
               repoUrl={repoUrl}
               onChangeRepoUrl={setRepoUrl}
+              githubToken={githubToken}
+              onGoSettings={() => setCurrentStep('settings')}
               onBack={() => setCurrentStep('settings')}
               onContinue={() => setCurrentStep('mode')}
             />

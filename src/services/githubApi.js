@@ -124,6 +124,42 @@ async function fetchWithRetry(url, options = {}, { retries = MAX_RETRIES, signal
 }
 
 /**
+ * Fetches the authenticated user's private repositories using a GitHub token.
+ */
+export async function fetchUserPrivateRepos({ token, signal }) {
+  if (!token) return [];
+  const allPrivate = [];
+  const MAX_PAGES = 3;
+
+  for (let page = 1; page <= MAX_PAGES; page++) {
+    const url = `${GITHUB_API_BASE}/user/repos?visibility=private&per_page=100&sort=updated&page=${page}`;
+    const res = await fetchWithRetry(url, { headers: buildGitHubHeaders(token) }, { signal });
+    const data = await res.json();
+    if (!Array.isArray(data) || data.length === 0) break;
+
+    for (const r of data) {
+      if (r.private) {
+        allPrivate.push({
+          id: r.id,
+          name: r.name,
+          fullName: r.full_name,
+          url: r.html_url,
+          description: r.description || '',
+          language: r.language || '',
+          defaultBranch: r.default_branch || 'main',
+          updatedAt: r.updated_at,
+          isPrivate: true,
+        });
+      }
+    }
+
+    if (data.length < 100) break;
+  }
+
+  return allPrivate;
+}
+
+/**
  * Fetches repository metadata (`default_branch`, `private`, `description`, etc.).
  */
 export async function fetchRepoMetadata({ owner, repo, token, signal }) {

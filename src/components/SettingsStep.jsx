@@ -5,8 +5,10 @@ import {
   CheckCircle2,
   Eye,
   EyeOff,
+  Github,
   KeyRound,
   Loader2,
+  Lock,
   Sparkles,
   Trash2,
 } from 'lucide-react';
@@ -17,14 +19,20 @@ import { getFriendlyErrorMessage } from '../utils/errors.js';
 export function SettingsStep({
   language,
   geminiKey,
+  githubToken = '',
   selectedModel,
   onSaveGeminiKey,
   onRemoveGeminiKey,
+  onSaveGithubToken,
+  onRemoveGithubToken,
   onSelectModel,
   onContinue,
 }) {
   const [geminiInput, setGeminiInput] = useState(geminiKey || '');
   const [showGemini, setShowGemini] = useState(false);
+
+  const [githubInput, setGithubInput] = useState(githubToken || '');
+  const [showGithub, setShowGithub] = useState(false);
 
   const [statusMessage, setStatusMessage] = useState(null);
   const [errorMsg, setErrorMsg] = useState('');
@@ -35,7 +43,12 @@ export function SettingsStep({
     setGeminiInput(geminiKey || '');
   }, [geminiKey]);
 
+  useEffect(() => {
+    setGithubInput(githubToken || '');
+  }, [githubToken]);
+
   const hasSavedGemini = Boolean(geminiKey);
+  const hasSavedGithub = Boolean(githubToken);
 
   const handleSaveOrUpdateGemini = (shouldAdvance = false) => {
     const trimmed = geminiInput.trim();
@@ -64,6 +77,33 @@ export function SettingsStep({
     setStatusMessage({
       type: 'info',
       text: t(language, 'settings.keyRemovedToast'),
+    });
+  };
+
+  const handleSaveOrUpdateGithub = () => {
+    const trimmed = githubInput.trim();
+    if (!trimmed) {
+      onRemoveGithubToken?.();
+      setStatusMessage({
+        type: 'info',
+        text: t(language, 'settings.tokenRemovedToast'),
+      });
+      return;
+    }
+    const wasSaved = hasSavedGithub;
+    onSaveGithubToken?.(trimmed);
+    setStatusMessage({
+      type: 'success',
+      text: wasSaved ? t(language, 'settings.tokenUpdatedToast') : t(language, 'settings.tokenSavedToast'),
+    });
+  };
+
+  const handleRemoveGithub = () => {
+    onRemoveGithubToken?.();
+    setGithubInput('');
+    setStatusMessage({
+      type: 'info',
+      text: t(language, 'settings.tokenRemovedToast'),
     });
   };
 
@@ -205,6 +245,68 @@ export function SettingsStep({
             </div>
           )}
         </div>
+
+        {/* GitHub Personal Access Token Section (Optional for Private Repos) */}
+        <div className="card-subtle section-stack">
+          <div className="field-group">
+            <div className="field-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <label htmlFor="github-token-input" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                <Github size={16} />
+                <span>GitHub Personal Access Token</span>
+              </label>
+              <span className="badge badge-secondary" style={{ fontSize: '0.75rem', padding: '2px 8px' }}>
+                Optional (for Private Repos)
+              </span>
+            </div>
+
+            <div className="input-row">
+              <div className="input-wrap">
+                <input
+                  id="github-token-input"
+                  type={showGithub ? 'text' : 'password'}
+                  className="text-input input-with-toggle mono"
+                  value={githubInput}
+                  onChange={(e) => setGithubInput(e.target.value)}
+                  placeholder="ghp_... or github_pat_... (optional)"
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+                <button
+                  type="button"
+                  className="toggle-visibility-btn"
+                  onClick={() => setShowGithub((s) => !s)}
+                  aria-label={showGithub ? t(language, 'settings.hideKey') : t(language, 'settings.showKey')}
+                >
+                  {showGithub ? <EyeOff size={13} /> : <Eye size={13} />}
+                  <span>{showGithub ? t(language, 'settings.hideKey') : t(language, 'settings.showKey')}</span>
+                </button>
+              </div>
+
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={handleSaveOrUpdateGithub}
+              >
+                {hasSavedGithub ? t(language, 'settings.updateToken') : t(language, 'settings.saveToken')}
+              </button>
+
+              {hasSavedGithub && (
+                <button
+                  type="button"
+                  className="btn btn-danger-outline"
+                  onClick={handleRemoveGithub}
+                >
+                  <Trash2 size={15} />
+                  <span>{t(language, 'settings.removeToken')}</span>
+                </button>
+              )}
+            </div>
+
+            <p className="field-hint">
+              Required only if you want to quiz private repositories and auto-list them. Keys stay in your browser localStorage.
+            </p>
+          </div>
+        </div>
       </div>
 
       <div className="actions-bar" style={{ justifyContent: 'flex-end' }}>
@@ -212,7 +314,12 @@ export function SettingsStep({
           <button
             type="button"
             className="btn btn-primary"
-            onClick={() => handleSaveOrUpdateGemini(true)}
+            onClick={() => {
+              if (githubInput.trim() && githubInput.trim() !== githubToken) {
+                onSaveGithubToken?.(githubInput.trim());
+              }
+              handleSaveOrUpdateGemini(true);
+            }}
           >
             <span>{t(language, 'settings.saveAndContinue')}</span>
             <ArrowRight size={16} />
@@ -222,6 +329,9 @@ export function SettingsStep({
             type="button"
             className="btn btn-primary"
             onClick={() => {
+              if (githubInput.trim() && githubInput.trim() !== githubToken) {
+                handleSaveOrUpdateGithub();
+              }
               if (geminiInput.trim() && geminiInput.trim() !== geminiKey) {
                 handleSaveOrUpdateGemini(true);
               } else {
