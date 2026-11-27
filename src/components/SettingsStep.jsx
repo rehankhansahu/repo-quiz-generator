@@ -5,7 +5,6 @@ import {
   CheckCircle2,
   Eye,
   EyeOff,
-  FolderGit2,
   KeyRound,
   Loader2,
   ShieldCheck,
@@ -19,20 +18,14 @@ import { getFriendlyErrorMessage } from '../utils/errors.js';
 export function SettingsStep({
   language,
   geminiKey,
-  githubToken,
   selectedModel,
   onSaveGeminiKey,
   onRemoveGeminiKey,
-  onSaveGithubToken,
-  onRemoveGithubToken,
   onSelectModel,
   onContinue,
 }) {
   const [geminiInput, setGeminiInput] = useState(geminiKey || '');
   const [showGemini, setShowGemini] = useState(false);
-
-  const [githubInput, setGithubInput] = useState(githubToken || '');
-  const [showGithub, setShowGithub] = useState(false);
 
   const [statusMessage, setStatusMessage] = useState(null);
   const [errorMsg, setErrorMsg] = useState('');
@@ -43,12 +36,7 @@ export function SettingsStep({
     setGeminiInput(geminiKey || '');
   }, [geminiKey]);
 
-  useEffect(() => {
-    setGithubInput(githubToken || '');
-  }, [githubToken]);
-
   const hasSavedGemini = Boolean(geminiKey);
-  const hasSavedGithub = Boolean(githubToken);
 
   const handleSaveOrUpdateGemini = (shouldAdvance = false) => {
     const trimmed = geminiInput.trim();
@@ -102,29 +90,6 @@ export function SettingsStep({
     } finally {
       setIsTesting(false);
     }
-  };
-
-  const handleSaveOrUpdateGithub = () => {
-    const trimmed = githubInput.trim();
-    if (!trimmed) {
-      handleRemoveGithub();
-      return;
-    }
-    const wasSaved = hasSavedGithub;
-    onSaveGithubToken(trimmed);
-    setStatusMessage({
-      type: 'success',
-      text: wasSaved ? t(language, 'settings.tokenUpdatedToast') : t(language, 'settings.tokenSavedToast'),
-    });
-  };
-
-  const handleRemoveGithub = () => {
-    onRemoveGithubToken();
-    setGithubInput('');
-    setStatusMessage({
-      type: 'info',
-      text: t(language, 'settings.tokenRemovedToast'),
-    });
   };
 
   return (
@@ -253,69 +218,6 @@ export function SettingsStep({
               </select>
             </div>
           )}
-        </div>
-
-        {/* Optional GitHub Token Section */}
-        <div className="card-subtle">
-          <div className="field-group">
-            <div className="field-label">
-              <label htmlFor="github-token-input" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-                <FolderGit2 size={16} />
-                {t(language, 'settings.githubSectionTitle')}
-              </label>
-              {hasSavedGithub ? (
-                <span className="badge badge-easy">{t(language, 'settings.githubSavedBadge')}</span>
-              ) : (
-                <span className="badge badge-neutral">{t(language, 'settings.githubOptionalBadge')}</span>
-              )}
-            </div>
-
-            <div className="input-row">
-              <div className="input-wrap">
-                <input
-                  id="github-token-input"
-                  type={showGithub ? 'text' : 'password'}
-                  className="text-input input-with-toggle mono"
-                  value={githubInput}
-                  onChange={(e) => setGithubInput(e.target.value)}
-                  placeholder={t(language, 'settings.githubPlaceholder')}
-                  autoComplete="off"
-                  spellCheck={false}
-                />
-                <button
-                  type="button"
-                  className="toggle-visibility-btn"
-                  onClick={() => setShowGithub((s) => !s)}
-                  aria-label={showGithub ? t(language, 'settings.hideKey') : t(language, 'settings.showKey')}
-                >
-                  {showGithub ? <EyeOff size={13} /> : <Eye size={13} />}
-                  <span>{showGithub ? t(language, 'settings.hideKey') : t(language, 'settings.showKey')}</span>
-                </button>
-              </div>
-
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={handleSaveOrUpdateGithub}
-                disabled={!githubInput.trim() && !hasSavedGithub}
-              >
-                {hasSavedGithub ? t(language, 'settings.updateToken') : t(language, 'settings.saveToken')}
-              </button>
-
-              {hasSavedGithub && (
-                <button
-                  type="button"
-                  className="btn btn-danger-outline"
-                  onClick={handleRemoveGithub}
-                >
-                  <Trash2 size={15} />
-                  <span>{t(language, 'settings.removeToken')}</span>
-                </button>
-              )}
-            </div>
-
-            <p className="field-hint">{t(language, 'settings.githubHelp')}</p>
-          </div>
         </div>
       </div>
 
